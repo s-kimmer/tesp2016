@@ -93,6 +93,7 @@ while True:
     #imgProj = np.zeros(h1, w1, np.uint8)
     imgProj = imgBG
     imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
+# This does not work:    
     #imgProj = cv2.cvtColor(imgProj, cv2.COLOR_GRAY2BGR)
 #    
     key = cv2.waitKey(2)
