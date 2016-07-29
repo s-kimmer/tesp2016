@@ -18,14 +18,14 @@ imgBG_path = "./src/original.png"
 camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./imgs2"
+imgSourceDir = "./src/imgs2"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 200
 
 
 # Do IT
-imgOL= cv2.imread(imgOL_path, 1)
+imgOL = cv2.imread(imgOL_path, 1)
 imgBG = cv2.imread(imgBG_path, 1)
 
 #ORB detector
@@ -74,8 +74,8 @@ while True:
         # File Source
         imgFileName = imgFileNameDesc % (imgIndex)
         imgFilePath = imgSourceDir + "/" + imgFileName
-        print("Loading" + imgFilePath)
-        frame = cv2.imread(imgFilePath)
+        print("Loading: " + imgFilePath)
+        frame = cv2.imread(imgFilePath, 1)
         imgIndex = imgIndex + 1
         
     #ORB detector
