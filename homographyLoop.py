@@ -36,7 +36,7 @@ if option == 1:
         if ret == True:
             wframe = cap.get(3)
             hframe = cap.get(4)
-            print("Frame width x height: {} x {} ".format( width, height ))
+            print("Frame width x height: {} x {} ".format( wframe, hframe ))
     else:
         ret = False
         
@@ -83,10 +83,10 @@ while True:
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
     
     UV = np.dot(H, UVcenter) #H or H^-1 ???
-    UV[1] = max(0 + 0.5 * wOL, UV[1])
-    UV[2] = max(0 + 0.5 * hOL, UV[2])
-    UV[1] = min(UV[1], 640 - 0.5 * wOL)
-    UV[2] = max(UV[2], 480 - 0.5 * hOL)
+    UV[1] = np.int(max(0 + 0.5 * wOL, UV[1]))
+    UV[2] = np.int(max(0 + 0.5 * hOL, UV[2]))
+    UV[1] = np.int(min(UV[1], 640 - 0.5 * wOL))
+    UV[2] = np.int(max(UV[2], 480 - 0.5 * hOL))
     
     
     #imgProj = np.zeros(h1, w1, np.uint8)
