@@ -122,7 +122,7 @@ while doLoop:
 
 
     # Show orig frame
-    #cv2.
+    #cv2. I am stronger than you!!!
     cv2.imshow("camera", frame)
 
     key = cv2.waitKey(2)
