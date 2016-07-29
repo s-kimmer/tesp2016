@@ -122,7 +122,11 @@ while doLoop:
 
 
     # Show orig frame
+<<<<<<< HEAD
     #cv2. I DONT WANT THIS
+=======
+    #cv2. I am stronger than you!!!
+>>>>>>> origin/master
     cv2.imshow("camera", frame)
 
     key = cv2.waitKey(2)
