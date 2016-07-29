@@ -9,13 +9,24 @@ automatically finding matching points, calculate H, process images to compare, p
 import cv2 
 import numpy as np
 
-option = 0 #choose 0 for static, 1 for webcam
+# SETTIGNS
+option = 0 #choose 0 for files, 1 for webcam
 
-#load images
+#image Settings
 imgOL_path = "./src/pikachu.jpg"
 imgBG_path = "./src/original.png"
-imgOL= cv2.imread(imgOL_path,0)
-imgBG = cv2.imread(imgBG_path,0)
+camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+
+# For captured camera images:
+imgSourceDir = "./imgs2"
+imgFileNameDesc = "img%03d.png"
+imgStartIndex = 0
+imgEndIndex = 200
+
+
+# Do IT
+imgOL= cv2.imread(imgOL_path, 1)
+imgBG = cv2.imread(imgBG_path, 1)
 
 #ORB detector
 cv2.ocl.setUseOpenCL(False) #bugfix
@@ -27,7 +38,6 @@ cv2.ocl.setUseOpenCL(True) #endoffix
 
 if option == 1:
     #cam initialzation
-    camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
     cap = cv2.VideoCapture(camera_device_index)
     
     if cap.isOpened(): # try to get the first frame
@@ -43,22 +53,30 @@ if option == 1:
     if ret: 
         cv2.imshow("webcam", frame)
 else:
-    frame = cv2.imread("./src/photo.png",0)
-    wframe = 640
-    hframe = 480
+    frame = 0
     
 imgProj = imgBG
 #hframe, wframe = frame.shape[:2]
 hOL, wOL = imgOL.shape[:2]
 UVcenter = np.array([[320], [240], [1]])
 
+imgIndex = imgStartIndex
+
 while True:
     cv2.imshow("projector", imgProj)    
     
     if option == 1:
+        # wEB CAM
         frame = cap.read()
     else:
-        frame = frame
+        if imgIndex > imgEndIndex:
+            break
+        # File Source
+        imgFileName = imgFileNameDesc % (imgIndex)
+        imgFilePath = imgSourceDir + "/" + imgFileName
+        print("Loading" + imgFilePath)
+        frame = cv2.imread(imgFilePath)
+        imgIndex = imgIndex + 1
         
     #ORB detector
     cv2.ocl.setUseOpenCL(False) #bugfix
