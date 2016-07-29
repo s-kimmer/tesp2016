@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 # Settings
-imgSaveDir = "./imgs"
+imgSaveDir = "./imgs2"
 imgFileNameDesc = "img%03d.png"
 imgPathToImageToDisplay = "./original.png"
 numImgsToCapture = 200
