@@ -10,13 +10,13 @@ import cv2
 import numpy as np
 
 # Settings
-imgSaveDir = "./imgs4"
+imgSaveDir = "./imgs2"
 imgFileNameDesc = "img%03d.png"
 imgPathToImageToDisplay = "./original.png"
 numImgsToCapture = 200
 pauseBetweenCaptures = 2000 #[mseconds]
 
-cameraDeviceIndex = 1 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # GO
 
