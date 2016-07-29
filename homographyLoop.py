@@ -83,16 +83,17 @@ while True:
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
     
     UV = np.dot(H, UVcenter) #H or H^-1 ???
-    UV[1] = np.int(max(0 + 0.5 * wOL, UV[1]))
-    UV[2] = np.int(max(0 + 0.5 * hOL, UV[2]))
-    UV[1] = np.int(min(UV[1], 640 - 0.5 * wOL))
-    UV[2] = np.int(max(UV[2], 480 - 0.5 * hOL))
+    UVconv = np.array([[0], [0]])
+    UVconv[0] = max(0 + 0.5 * wOL, UV[0])
+    UVconv[1] = max(0 + 0.5 * hOL, UV[1])
+    UVconv[0] = min(UV[0], 640 - 0.5 * wOL)
+    UVconv[1] = min(UV[1], 480 - 0.5 * hOL)
     
     
     #imgProj = np.zeros(h1, w1, np.uint8)
     imgProj = imgBG
-    imgProj[(UV[2] - 0.5 * hOL):(UV[2] + 0.5 * hOL), (UV[1] - 0.5 * wOL):(UV[1] + 0.5 * wOL)] = imgOL
-    imgProj = cv2.cvtColor(imgProj, cv2.COLOR_GRAY2BGR)
+    imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
+    #imgProj = cv2.cvtColor(imgProj, cv2.COLOR_GRAY2BGR)
 #    
     key = cv2.waitKey(2)
     if key == 27:
