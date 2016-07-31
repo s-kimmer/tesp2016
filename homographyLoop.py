@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 # SETTIGNS
-option = 0 #choose 0 for files, 1 for webcam
+option = 1 #choose 0 for files, 1 for webcam
 
 #image Settings
 imgOL_path = "./src/pikachu.jpg"
@@ -62,12 +62,17 @@ UVcenter = np.array([[320], [240], [1]])
 
 imgIndex = imgStartIndex
 
-while True:
+doLoop = True
+while doLoop:
     cv2.imshow("projector", imgProj)    
+    
     
     if option == 1:
         # wEB CAM
-        frame = cap.read()
+        ret, frame = cap.read()
+        if ret == False:
+            print("Img capture failed")
+            break
     else:
         if imgIndex > imgEndIndex:
             break
@@ -78,6 +83,9 @@ while True:
         frame = cv2.imread(imgFilePath, 1)
         imgIndex = imgIndex + 1
         
+        
+    
+    
     #ORB detector
     cv2.ocl.setUseOpenCL(False) #bugfix
     kpframe = orb.detect(frame,None) #find the keypoints with ORB
@@ -100,23 +108,39 @@ while True:
     #homography    
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
     
-    UV = np.dot(H, UVcenter) #H or H^-1 ???
+    UV = np.dot(np.linalg.inv(H), UVcenter) #H or H^-1 ???
     UVconv = np.array([[0], [0]])
-    UVconv[0] = max(0 + 0.5 * wOL, UV[0])
-    UVconv[1] = max(0 + 0.5 * hOL, UV[1])
-    UVconv[0] = min(UV[0], 640 - 0.5 * wOL)
-    UVconv[1] = min(UV[1], 480 - 0.5 * hOL)
+    UVconv[0] = max(1 + 0.5 * wOL, UV[0])
+    UVconv[1] = max(1 + 0.5 * hOL, UV[1])
+    UVconv[0] = min(UV[0], 640 - 0.5 * wOL -1)
+    UVconv[1] = min(UV[1], 480 - 0.5 * hOL -1)
     
-    
+ 
     #imgProj = np.zeros(h1, w1, np.uint8)
-    imgProj = imgBG
+    imgProj = imgBG.copy()
     imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
-# This does not work:
-# new comment    
-    #imgProj = cv2.cvtColor(imgProj, cv2.COLOR_GRAY2BGR)
-#    
+
+
+    # Show orig frame
+<<<<<<< HEAD
+    #cv2. I DONT WANT THIS
+=======
+    #cv2. I am stronger than you!!!
+>>>>>>> origin/master
+    cv2.imshow("camera", frame)
+
     key = cv2.waitKey(2)
     if key == 27:
         cv2.destroyAllWindows()
+        cap.release
+        doLoop = False
         break
 
+#    while key != 13 & option != 0:
+#        key = cv2.waitKey(2)
+#        if key == 27:
+#            cv2.destroyAllWindows()
+#            doLoop = False
+#            break
+
+        
