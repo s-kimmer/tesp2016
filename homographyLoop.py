@@ -9,14 +9,19 @@ automatically finding matching points, calculate H, process images to compare, p
 import cv2 
 import numpy as np
 
+######################
 # SETTIGNS
-option = 0 #choose 0 for files, 1 for webcam
 
-#image Settings
-imgOL_path = "./src/pikachu.jpg"
-imgBG_path = "./src/original.png"
-imgFG_path = "./src/originalblue.png"
-camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+option = 1 #choose 0 for files, 1 for webcam
+
+#images
+imgLayer0Path = "./src/original.png"
+imgLayer1Path = "./src/originalblue.png"
+imgLayer2Path = "./src/pikachu.jpg"
+
+imgMaskPath = "./src/maskRound.png"
+
+cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
 imgSourceDir = "./src/imgs2"
@@ -24,36 +29,53 @@ imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 200
 
+### Parameters
+minimumMatchCount = 4   
+homographyThreshold = 5.0
 
+
+#########################
 # Do IT
-imgOL = cv2.imread(imgOL_path, 1)
-hOL, wOL = imgOL.shape[:2]
-imgBG = cv2.imread(imgBG_path, 1)
-imgFG = cv2.imread(imgFG_path, 1)
+
+imgLayer0 = cv2.imread(imgLayer0Path, 1)
+imgLayer1 = cv2.imread(imgLayer1Path, 1)
+imgLayer2 = cv2.imread(imgLayer2Path, 1)
+imgMaskOrig = cv2.imread(imgMaskPath, 1)
+
+UVcenter = np.array([[320], [240], [1]])
+heightImgLayer2, widthImgLayer2 = imgLayer2.shape[:2]
 
 #Mask initialization
-wMask = hOL 
-hMask = wOL
-MaskImg = np.zeros_like(imgBG)
-UVcenter = np.array([[320], [240], [1]])
-yMin = UVcenter[1] - 0.5 * hMask
-yMax = UVcenter[1] + 0.5 * hMask
-xMin = UVcenter[0] - 0.5 * wMask
-xMax = UVcenter[0] + 0.5 * wMask
-MaskImg[yMin:yMax, xMin:xMax] = 1 
+#wMask = heightImgLayer2 
+#hMask = widthImgLayer2
+#imgMask = np.zeros_like(imgLayer0)
+#yMin = UVcenter[1] - 0.5 * hMask
+#yMax = UVcenter[1] + 0.5 * hMask
+#xMin = UVcenter[0] - 0.5 * wMask
+#xMax = UVcenter[0] + 0.5 * wMask
+#imgMask[yMin:yMax, xMin:xMax] = 1 
+
+threshhold = 125
+imgMask = imgMaskOrig.copy()
+imgMask[imgMaskOrig >= threshhold] = 0
+imgMask[imgMaskOrig < threshhold] = 1
+
+maskSize = (imgMask.shape[1],imgMask.shape[0])
 
 
-#ORB detector
+#Init ORB detector and feature matcher
 cv2.ocl.setUseOpenCL(False) #bugfix
 orb = cv2.ORB_create()
 
-kpBG = orb.detect(imgBG,None) #find the keypoints with ORB
-kpBG, desBG = orb.compute(imgBG, kpBG) # compute the descriptors with ORB
-cv2.ocl.setUseOpenCL(True) #endoffix
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
+
+keyPointsLayer0 = orb.detect(imgLayer0, None)
+keyPointsLayer0, descriptorKeyPointsLayer0 = orb.compute(imgLayer0, keyPointsLayer0)
+#cv2.ocl.setUseOpenCL(True) #endoffix
 
 if option == 1:
     #cam initialzation
-    cap = cv2.VideoCapture(camera_device_index)
+    cap = cv2.VideoCapture(cameraDeviceIndex)
     
     if cap.isOpened(): # try to get the first frame
         print("Opened camera stream!")
@@ -70,18 +92,26 @@ if option == 1:
 else:
     frame = 0
 
+
+# Create Window for fullscreen display
+cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN)          
+cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+cv2.moveWindow("projector", 1920, 0)
+
+cv2.imshow("projector", imgLayer0)    
+
 #initialization
-imgProj = imgBG
+imgProj = imgLayer0
 imgIndex = imgStartIndex
 doLoop = True
 
+
 while doLoop:
-    cv2.imshow("projector", imgProj)    
-    
+ 
     
     if option == 1:
-        # wEB CAM
-        ret, frame = cap.read()
+        # Web cam
+        ret, capturedImg = cap.read()
         if ret == False:
             print("Img capture failed")
             break
@@ -92,53 +122,35 @@ while doLoop:
         imgFileName = imgFileNameDesc % (imgIndex)
         imgFilePath = imgSourceDir + "/" + imgFileName
         print("Loading: " + imgFilePath)
-        frame = cv2.imread(imgFilePath, 1)
+        capturedImg = cv2.imread(imgFilePath, 1)
         imgIndex = imgIndex + 1
         
-        
     
-    
-    #ORB detector
-    cv2.ocl.setUseOpenCL(False) #bugfix
-    kpframe = orb.detect(frame,None) #find the keypoints with ORB
-    kpframe, desframe = orb.compute(frame, kpframe) # compute the descriptors with ORB
-    cv2.ocl.setUseOpenCL(True) #endoffix
+    # Find features in curent captured img
+    kpCapturedImg = orb.detect(capturedImg, None) 
+    kpCapturedImg, desCapturedImg = orb.compute(capturedImg, kpCapturedImg)
     
     #find matching points
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
-    matches = bf.match(desBG,desframe) # Match descriptors
-    
-    MIN_MATCH_COUNT = 4       
-    if len(matches)>MIN_MATCH_COUNT:
-        src_pts = np.float32([ kpBG[m.queryIdx].pt for m in matches ])
-        dst_pts = np.float32([ kpframe[m.trainIdx].pt for m in matches ])
+    matches = bf.match(descriptorKeyPointsLayer0, desCapturedImg) # Match descriptors
+        
+    if len(matches) > minimumMatchCount:
+        src_pts = np.float32([ keyPointsLayer0[m.queryIdx].pt for m in matches ])
+        dst_pts = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
     else:
         print("Error: less than four matching points")
-        break
+        continue
 
-
-    #homography    
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
-    
-    UV = np.dot(np.linalg.inv(H), UVcenter) #H or H^-1 ???
-    
-#    #Pikachu Overlay
-#    UVconv = np.array([[0], [0]])
-#    UVconv[0] = max(1 + 0.5 * wOL, UV[0])
-#    UVconv[1] = max(1 + 0.5 * hOL, UV[1])
-#    UVconv[0] = min(UV[0], 640 - 0.5 * wOL -1)
-#    UVconv[1] = min(UV[1], 480 - 0.5 * hOL -1)
-#    
-# 
-#    #imgProj = np.zeros(h1, w1, np.uint8)
-#    imgProj = imgBG.copy()
-#    imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, homographyThreshold)
    
-    #flashlight Overlay
-    MaskImgProj = cv2.warpPerspective(MaskImg, np.linalg.inv(H), (MaskImg.shape[1],MaskImg.shape[0]))
-    imgProj = np.multiply(imgFG, MaskImgProj) + np.multiply(imgBG, (1-MaskImgProj))
 
-    cv2.imshow("camera", frame)
+    #flashlight Overlay
+    imgMaskProj = cv2.warpPerspective(imgMask, np.linalg.inv(H), maskSize)
+    imgProj = np.multiply(imgLayer1, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+
+
+    # Display stuff
+    cv2.imshow("projector", imgProj)
+    cv2.imshow("camera", capturedImg)
 
     #cancelation criteria
     key = cv2.waitKey(2)
@@ -146,7 +158,31 @@ while doLoop:
         cv2.destroyAllWindows()
         
         if option == 1:
+            print("Releasing image capture device")
             cap.release
         
         doLoop = False
         break
+    
+    
+    
+    
+    
+    
+    
+    
+    
+#    UV = np.dot(np.linalg.inv(H), UVcenter)
+    
+#    #Pikachu Overlay
+#    UVconv = np.array([[0], [0]])
+#    UVconv[0] = max(1 + 0.5 * widthImgLayer2, UV[0])
+#    UVconv[1] = max(1 + 0.5 * heightImgLayer2, UV[1])
+#    UVconv[0] = min(UV[0], 640 - 0.5 * widthImgLayer2 -1)
+#    UVconv[1] = min(UV[1], 480 - 0.5 * heightImgLayer2 -1)
+#    
+# 
+#    #imgProj = np.zeros(h1, w1, np.uint8)
+#    imgProj = imgLayer0.copy()
+#    imgProj[(np.int(UVconv[1] - 0.5 * heightImgLayer2)):np.int((UVconv[1] + 0.5 * heightImgLayer2)), np.int((UVconv[0] - 0.5 * widthImgLayer2)):np.int((UVconv[0] + 0.5 * widthImgLayer2))] = imgLayer2
+   
