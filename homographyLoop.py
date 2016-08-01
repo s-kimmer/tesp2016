@@ -42,18 +42,7 @@ imgLayer1 = cv2.imread(imgLayer1Path, 1)
 imgLayer2 = cv2.imread(imgLayer2Path, 1)
 imgMaskOrig = cv2.imread(imgMaskPath, 1)
 
-UVcenter = np.array([[320], [240], [1]])
 heightImgLayer2, widthImgLayer2 = imgLayer2.shape[:2]
-
-#Mask initialization
-#wMask = heightImgLayer2 
-#hMask = widthImgLayer2
-#imgMask = np.zeros_like(imgLayer0)
-#yMin = UVcenter[1] - 0.5 * hMask
-#yMax = UVcenter[1] + 0.5 * hMask
-#xMin = UVcenter[0] - 0.5 * wMask
-#xMax = UVcenter[0] + 0.5 * wMask
-#imgMask[yMin:yMax, xMin:xMax] = 1 
 
 threshhold = 125
 imgMask = imgMaskOrig.copy()
@@ -61,6 +50,17 @@ imgMask[imgMaskOrig >= threshhold] = 0
 imgMask[imgMaskOrig < threshhold] = 1
 
 maskSize = (imgMask.shape[1],imgMask.shape[0])
+maskCenter = np.array([maskSize[0] / 2, maskSize[1] / 2, 1])
+
+#Mask initialization
+#wMask = heightImgLayer2 
+#hMask = widthImgLayer2
+#imgMask = np.zeros_like(imgLayer0)
+#yMin = maskCenter[1] - 0.5 * hMask
+#yMax = maskCenter[1] + 0.5 * hMask
+#xMin = maskCenter[0] - 0.5 * wMask
+#xMax = maskCenter[0] + 0.5 * wMask
+#imgMask[yMin:yMax, xMin:xMax] = 1 
 
 
 #Init ORB detector and feature matcher
@@ -172,7 +172,7 @@ while doLoop:
     
     
     
-#    UV = np.dot(np.linalg.inv(H), UVcenter)
+#    UV = np.dot(np.linalg.inv(H), maskCenter)
     
 #    #Pikachu Overlay
 #    UVconv = np.array([[0], [0]])
