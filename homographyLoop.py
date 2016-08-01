@@ -10,11 +10,12 @@ import cv2
 import numpy as np
 
 # SETTIGNS
-option = 1 #choose 0 for files, 1 for webcam
+option = 0 #choose 0 for files, 1 for webcam
 
 #image Settings
 imgOL_path = "./src/pikachu.jpg"
 imgBG_path = "./src/original.png"
+imgFG_path = "./src/originalblue.png"
 camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
@@ -26,7 +27,21 @@ imgEndIndex = 200
 
 # Do IT
 imgOL = cv2.imread(imgOL_path, 1)
+hOL, wOL = imgOL.shape[:2]
 imgBG = cv2.imread(imgBG_path, 1)
+imgFG = cv2.imread(imgFG_path, 1)
+
+#Mask initialization
+wMask = hOL 
+hMask = wOL
+MaskImg = np.zeros_like(imgBG)
+UVcenter = np.array([[320], [240], [1]])
+yMin = UVcenter[1] - 0.5 * hMask
+yMax = UVcenter[1] + 0.5 * hMask
+xMin = UVcenter[0] - 0.5 * wMask
+xMax = UVcenter[0] + 0.5 * wMask
+MaskImg[yMin:yMax, xMin:xMax] = 1 
+
 
 #ORB detector
 cv2.ocl.setUseOpenCL(False) #bugfix
@@ -54,15 +69,12 @@ if option == 1:
         cv2.imshow("webcam", frame)
 else:
     frame = 0
-    
+
+#initialization
 imgProj = imgBG
-#hframe, wframe = frame.shape[:2]
-hOL, wOL = imgOL.shape[:2]
-UVcenter = np.array([[320], [240], [1]])
-
 imgIndex = imgStartIndex
-
 doLoop = True
+
 while doLoop:
     cv2.imshow("projector", imgProj)    
     
@@ -109,38 +121,32 @@ while doLoop:
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
     
     UV = np.dot(np.linalg.inv(H), UVcenter) #H or H^-1 ???
-    UVconv = np.array([[0], [0]])
-    UVconv[0] = max(1 + 0.5 * wOL, UV[0])
-    UVconv[1] = max(1 + 0.5 * hOL, UV[1])
-    UVconv[0] = min(UV[0], 640 - 0.5 * wOL -1)
-    UVconv[1] = min(UV[1], 480 - 0.5 * hOL -1)
     
- 
-    #imgProj = np.zeros(h1, w1, np.uint8)
-    imgProj = imgBG.copy()
-    imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
+#    #Pikachu Overlay
+#    UVconv = np.array([[0], [0]])
+#    UVconv[0] = max(1 + 0.5 * wOL, UV[0])
+#    UVconv[1] = max(1 + 0.5 * hOL, UV[1])
+#    UVconv[0] = min(UV[0], 640 - 0.5 * wOL -1)
+#    UVconv[1] = min(UV[1], 480 - 0.5 * hOL -1)
+#    
+# 
+#    #imgProj = np.zeros(h1, w1, np.uint8)
+#    imgProj = imgBG.copy()
+#    imgProj[(np.int(UVconv[1] - 0.5 * hOL)):np.int((UVconv[1] + 0.5 * hOL)), np.int((UVconv[0] - 0.5 * wOL)):np.int((UVconv[0] + 0.5 * wOL))] = imgOL
+   
+    #flashlight Overlay
+    MaskImgProj = cv2.warpPerspective(MaskImg, np.linalg.inv(H), (MaskImg.shape[1],MaskImg.shape[0]))
+    imgProj = np.multiply(imgFG, MaskImgProj) + np.multiply(imgBG, (1-MaskImgProj))
 
-
-    # Show orig frame
-<<<<<<< HEAD
-    #cv2. I DONT WANT THIS
-=======
-    #cv2. I am stronger than you!!!
->>>>>>> origin/master
     cv2.imshow("camera", frame)
 
+    #cancelation criteria
     key = cv2.waitKey(2)
-    if key == 27:
+    if (key == 27) | (imgIndex == imgEndIndex):
         cv2.destroyAllWindows()
-        cap.release
+        
+        if option == 1:
+            cap.release
+        
         doLoop = False
         break
-
-#    while key != 13 & option != 0:
-#        key = cv2.waitKey(2)
-#        if key == 27:
-#            cv2.destroyAllWindows()
-#            doLoop = False
-#            break
-
-        
