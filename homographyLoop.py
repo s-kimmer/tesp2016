@@ -6,7 +6,7 @@ Created on Tue Jul 26 08:43:04 2016
 
 automatically finding matching points, calculate H, process images to compare, plots
 """
-import cv2 
+import cv2
 import numpy as np
 
 ######################
@@ -17,7 +17,10 @@ option = 1 #choose 0 for files, 1 for webcam
 #images
 imgLayer0Path = "./src/original.png"
 imgLayer1Path = "./src/originalblue.png"
-imgLayer2Path = "./src/pikachu.jpg"
+#imgLayer2Path = "./src/pikachu.jpg"
+imgLayer2Path = "./src/originalred.png"
+imgLayer3Path = "./src/originalgreen.png"
+imgLayer4Path = "./src/originalred.png"
 
 imgMaskPath = "./src/maskRound.png"
 
@@ -40,6 +43,9 @@ homographyThreshold = 5.0
 imgLayer0 = cv2.imread(imgLayer0Path, 1)
 imgLayer1 = cv2.imread(imgLayer1Path, 1)
 imgLayer2 = cv2.imread(imgLayer2Path, 1)
+imgLayer3 = cv2.imread(imgLayer3Path, 1)
+imgLayer4 = cv2.imread(imgLayer4Path, 1)
+
 imgMaskOrig = cv2.imread(imgMaskPath, 1)
 
 UVcenter = np.array([[320], [240], [1]])
@@ -104,7 +110,55 @@ cv2.imshow("projector", imgLayer0)
 imgProj = imgLayer0
 imgIndex = imgStartIndex
 doLoop = True
+RotIndOrig = np.array([[320,320],[0,480],[1,1]])
+Rot = 0
+mode = 0 #mode
+numOfH = 0 #number of 'high' states
+counter = 0 #noise toleration 
 
+#rotation detection
+# if no rotation, Rot = 0; if anticlockwise rotation(90+-30), Rot = 1, if 
+#clockwise rotation(90+-30), Rot = 2; else Rot = 3 
+
+def rotation(H,RotIndOrig):        #Rotation dection
+    RotIndProj = np.dot(np.linalg.inv(H), RotIndOrig)
+    RotDis = RotIndProj[1,0] - RotIndProj[1,1]
+    if np.abs(RotDis) < 240:#240 = 480*sin30
+        if RotIndProj[0,0] < RotIndProj[0,1]:
+            Rot = 1 #anticlockwise rotation
+        else:
+            Rot = 2 #clockwise rotation
+    elif np.abs(RotDis) > 339:#339 = 480*cos30
+        Rot = 0
+    else:
+        Rot = 3
+#    print Rot
+    return Rot
+# mode switch
+def switch(Rot,counter,numOfH,mode):
+    if Rot == 1:
+        counter = 3
+    elif counter > 0 :
+        counter = counter - 1
+                
+    if counter > 0:
+        numOfH = numOfH + 1
+    else:
+        numOfH = 0
+       
+    print "Rot = %d" % Rot
+    print "numOfH = %d"%numOfH        
+    
+    if numOfH >= 15:        
+        if mode >= 3:# 3 modes
+            mode = 0
+        else:
+            mode = mode + 1
+        numOfH = 0
+        counter = 0            
+
+    print "mode = %d\n" % mode
+    return (mode,counter,numOfH)        
 
 while doLoop:
  
@@ -142,11 +196,20 @@ while doLoop:
 
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, homographyThreshold)
    
-
+       # Rotation detection
+    Rot = rotation(H,RotIndOrig)
+    mode,counter,numOfH = switch(Rot,counter,numOfH,mode)
+    
     #flashlight Overlay
     imgMaskProj = cv2.warpPerspective(imgMask, np.linalg.inv(H), maskSize)
-    imgProj = np.multiply(imgLayer1, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
-
+    if mode == 0:    
+        imgProj = np.multiply(imgLayer1, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+    elif mode == 1:
+        imgProj = np.multiply(imgLayer2, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+    elif mode == 2:
+        imgProj = np.multiply(imgLayer3, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+    else:
+        imgProj = np.multiply(imgLayer4, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
 
     # Display stuff
     cv2.imshow("projector", imgProj)
