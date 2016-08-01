@@ -13,12 +13,12 @@ import numpy as np
 option = 1 #choose 0 for files, 1 for webcam
 
 #image Settings
-imgOL_path = "./tesp2016/src/pikachu.jpg"
-imgBG_path = "./tesp2016/src/original.png"
-camera_device_index = 1 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+imgOL_path = "./src/pikachu.jpg"
+imgBG_path = "./src/original.png"
+camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./tesp2016/src/imgs5"
+imgSourceDir = "./src/imgs5"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 400
@@ -109,6 +109,13 @@ def switch(Rot,counter,numOfH,mode):
 
     print "mode = %d\n" % mode
     return (mode,counter,numOfH)        
+
+
+# Create Window for fullscreen display
+cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN)          
+cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+cv2.moveWindow("projector", 1920, 0)
+
 
 while doLoop:
     cv2.imshow("projector", imgProj)    
