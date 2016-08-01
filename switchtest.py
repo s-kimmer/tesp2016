@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 # SETTIGNS
-option = 1 #choose 0 for files, 1 for webcam
+option = 0 #choose 0 for files, 1 for webcam
 
 #image Settings
 imgOL_path = "./tesp2016/src/pikachu.jpg"
@@ -86,15 +86,17 @@ def rotation(H,RotIndOrig):        #Rotation dection
 
 mode = 0 #mode
 numOfH = 0 #number of 'high' states
-counter = 3 #noise toleration 
+counter = 0 #noise toleration 
 def switch(Rot,counter,numOfH,mode):
     if Rot == 1:
         counter = 3
-        if Rot !=1 :
-            counter = counter - 1
+    elif counter > 0 :
+        counter = counter - 1
                 
-        if counter >= 0:
-            numOfH = numOfH + 1
+    if counter > 0:
+        numOfH = numOfH + 1
+    else:
+        numOfH = 0
        
     print "Rot = %d" % Rot
     print "numOfH = %d"%numOfH        
@@ -105,7 +107,7 @@ def switch(Rot,counter,numOfH,mode):
         else:
             mode = mode + 1
         numOfH = 0
-        counter = 3            
+        counter = 0            
 
     print "mode = %d\n" % mode
     return (mode,counter,numOfH)        
