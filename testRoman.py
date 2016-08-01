@@ -17,4 +17,7 @@ while True:
     UVstack[1,0] = UV[1]
     UVfilt = np.mean(UVstack, axis=1)
     
+#    H2 = H1
+#    H1 = H0
+#    H0 = H
  
