@@ -16,8 +16,7 @@ option = 1 #choose 0 for files, 1 for webcam
 
 #images
 imgLayer0Path = "./src/original.png"
-imgLayer1Path = "./src/originalblue.png"
-#imgLayer2Path = "./src/pikachu.jpg"
+imgLayer1Path = "./src/muscles.png"
 imgLayer2Path = "./src/originalred.png"
 imgLayer3Path = "./src/originalgreen.png"
 imgLayer4Path = "./src/originalred.png"
@@ -33,12 +32,13 @@ imgStartIndex = 0
 imgEndIndex = 200
 
 ### Parameters
-minimumMatchCount = 4   
-homographyThreshold = 5.0
+minimumMatchCount = 8
+homographyThreshold = 10
 
 
 #########################
 # Do IT
+
 
 imgLayer0 = cv2.imread(imgLayer0Path, 1)
 imgLayer1 = cv2.imread(imgLayer1Path, 1)
@@ -54,6 +54,7 @@ threshhold = 125
 imgMask = imgMaskOrig.copy()
 imgMask[imgMaskOrig >= threshhold] = 0
 imgMask[imgMaskOrig < threshhold] = 1
+
 
 maskSize = (imgMask.shape[1],imgMask.shape[0])
 maskCenter = np.array([maskSize[0] / 2, maskSize[1] / 2, 1])
@@ -75,9 +76,8 @@ orb = cv2.ORB_create()
 
 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
 
-keyPointsLayer0 = orb.detect(imgLayer0, None)
-keyPointsLayer0, descriptorKeyPointsLayer0 = orb.compute(imgLayer0, keyPointsLayer0)
-#cv2.ocl.setUseOpenCL(True) #endoffix
+keyPoints = orb.detect(imgLayer0, None)
+keyPoints, descriptorKeyPoints = orb.compute(imgLayer0, keyPoints)
 
 if option == 1:
     #cam initialzation
@@ -110,6 +110,8 @@ cv2.imshow("projector", imgLayer0)
 imgProj = imgLayer0
 imgIndex = imgStartIndex
 doLoop = True
+
+
 RotIndOrig = np.array([[320,320],[0,480],[1,1]])
 Rot = 0
 mode = 0 #mode
@@ -180,15 +182,22 @@ while doLoop:
         imgIndex = imgIndex + 1
         
     
+    # Find features in projector img
+    kpProjImg = orb.detect(imgProj, None) 
+    kpProjImg, desProjImg = orb.compute(imgProj, kpProjImg)    
+    keyPoints = kpProjImg
+    descriptorKeyPoints = desProjImg
+    
     # Find features in curent captured img
     kpCapturedImg = orb.detect(capturedImg, None) 
     kpCapturedImg, desCapturedImg = orb.compute(capturedImg, kpCapturedImg)
     
     #find matching points
-    matches = bf.match(descriptorKeyPointsLayer0, desCapturedImg) # Match descriptors
+    matches = bf.match(descriptorKeyPoints, desCapturedImg) # Match descriptors
         
     if len(matches) > minimumMatchCount:
-        src_pts = np.float32([ keyPointsLayer0[m.queryIdx].pt for m in matches ])
+        print(len(matches))
+        src_pts = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
         dst_pts = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
     else:
         print("Error: less than four matching points")
@@ -202,20 +211,26 @@ while doLoop:
     
     #flashlight Overlay
     imgMaskProj = cv2.warpPerspective(imgMask, np.linalg.inv(H), maskSize)
+    
+    
     if mode == 0:    
-        imgProj = np.multiply(imgLayer1, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+        currentLayerImg = imgLayer1        
     elif mode == 1:
-        imgProj = np.multiply(imgLayer2, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+        currentLayerImg = imgLayer2
     elif mode == 2:
-        imgProj = np.multiply(imgLayer3, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
-    else:
-        imgProj = np.multiply(imgLayer4, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+        currentLayerImg = imgLayer3
+    else:        
+        currentLayerImg = imgLayer4
+
+    imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+
 
     # Display stuff
     cv2.imshow("projector", imgProj)
-    cv2.imshow("camera", capturedImg)
+    cv2.imshow("webcam", capturedImg)
 
     #cancelation criteria
+    # note: waitkey does the event procesing of the e.g. the imshow function
     key = cv2.waitKey(2)
     if (key == 27) | (imgIndex == imgEndIndex):
         cv2.destroyAllWindows()
@@ -223,7 +238,8 @@ while doLoop:
         if option == 1:
             print("Releasing image capture device")
             cap.release
-        
+            cap.release
+            
         doLoop = False
         break
     
