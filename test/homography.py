@@ -2,56 +2,73 @@
 """
 Created on Tue Jul 26 08:43:04 2016
 
-@author: ROMANMUELLER
-
-automatically finding matching points, calculate H, process images to compare, plots
+@author: Stefan Kimmer
 """
 import cv2 
 import numpy as np
 
-#load images
-img0_path = "./photo.png"
-img1_path = "./original.png"
-img0 = cv2.imread(img0_path,0)
-img1 = cv2.imread(img1_path,0)
+## Settings
+imgCapturedPath = "../src/imgs3/img000.png"
+imgOriginalPath = "../src/layerImgs/original.png"
 
-# Initiate ORB detector
+MIN_MATCH_COUNT = 4
+
+
+imgCaptured = cv2.imread(imgCapturedPath, cv2.IMREAD_COLOR)
+imgOriginal = cv2.imread(imgOriginalPath, cv2.IMREAD_COLOR)
+
+# Initiate ORB detector and BF matcher
 cv2.ocl.setUseOpenCL(False) #bugfix
 orb = cv2.ORB_create()
 
-kp0 = orb.detect(img0,None) #find the keypoints with ORB
-kp1 = orb.detect(img1,None)
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck = True)
 
-kp0, des0 = orb.compute(img0, kp0) # compute the descriptors with ORB
-kp1, des1 = orb.compute(img1, kp1)
+ #find the keypoints and match them
+kpCaptured = orb.detect(imgCaptured, None)
+kpOriginal = orb.detect(imgOriginal, None)
 
-cv2.ocl.setUseOpenCL(True) #endoffix
+kpCaptured, desCaptured = orb.compute(imgCaptured, kpCaptured)
+kpOriginal, desOriginal = orb.compute(imgOriginal, kpOriginal)
 
 #find matching points
-bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
-matches = bf.match(des0,des1) # Match descriptors
+matches = bf.match(desCaptured, desOriginal)
 
-MIN_MATCH_COUNT = 4       
-if len(matches)>MIN_MATCH_COUNT:
-    src_pts = np.float32([ kp0[m.queryIdx].pt for m in matches ])
-    dst_pts = np.float32([ kp1[m.trainIdx].pt for m in matches ])
+if len(matches) > MIN_MATCH_COUNT:
+    ptsCaptured = np.float32([ kpCaptured[m.queryIdx].pt for m in matches ])
+    ptsOriginal = np.float32([ kpOriginal[m.trainIdx].pt for m in matches ])
+
+
     
-#homography    
-H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+# Compute homography    
+H, mask = cv2.findHomography(ptsOriginal, ptsCaptured, cv2.RANSAC, 5.0)
 
-#img-processin
-img2 = cv2.warpPerspective(img1, np.linalg.inv(H), (img1.shape[1],img1.shape[0]))
-img3 = cv2.warpPerspective(img0, H, (img1.shape[1],img1.shape[0]))
+
+# init out image
+imgMatchesVisu = 0
+# Note that  matchesMask from 
+# cv2.drawMatches() does not seem to work with the mask
+imgMatchesVisu = cv2.drawMatches(imgCaptured, kpCaptured, \
+    imgOriginal, kpOriginal, matches, imgMatchesVisu)
+
+
+#img-processing
+size = (imgCaptured.shape[1], imgCaptured.shape[0])
+imgProjected = cv2.warpPerspective(imgOriginal, H, size)
+
+# reproject the original image onto the camptured one
+imgReprojected = imgCaptured.copy()
+validIndex = imgProjected != 0
+imgReprojected[validIndex] = imgProjected[validIndex]
 
 #plots
-cv2.imshow("original", img0)
-cv2.imshow("photo", img1)
-cv2.imshow("transform", img2)
-cv2.imshow("transfom2", img3)
+cv2.imshow("Matches", imgMatchesVisu)
 
-#close windows
-while True:
-    key = cv2.waitKey(20)
-    if key == 27:
-        cv2.destroyAllWindows()
-        break
+cv2.imshow("Original", imgOriginal)
+cv2.imshow("Captured", imgCaptured)
+cv2.imshow("Reprojected", imgReprojected)
+
+
+# Process gui events (e.g. for image display)
+key = cv2.waitKey(0) # 0 waits forever
+if key == 27: # Escape button pressed
+    cv2.destroyAllWindows()
