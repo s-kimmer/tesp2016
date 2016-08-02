@@ -12,7 +12,7 @@ import numpy as np
 ######################
 # SETTIGNS
 
-option = 1 #choose 0 for files, 1 for webcam
+option = 0 #choose 0 for files, 1 for webcam
 
 #images
 imgLayer0Path = "./src/original.png"
@@ -26,7 +26,7 @@ imgMaskPath = "./src/maskRound.png"
 cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./src/imgs2"
+imgSourceDir = "./src/imgs5"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 200
@@ -35,6 +35,59 @@ imgEndIndex = 200
 minimumMatchCount = 8
 homographyThreshold = 10
 
+
+
+#########################
+# Functions
+  
+    
+#rotation detection
+# if no rotation, Rot = 0; if anticlockwise rotation(90+-30), Rot = 1, if 
+#clockwise rotation(90+-30), Rot = 2; else Rot = 3 
+
+def rotation(H, RotIndOrig):        #Rotation dection
+    RotIndProj = np.dot(np.linalg.inv(H), RotIndOrig)
+    RotDis = RotIndProj[1,0] - RotIndProj[1,1]
+    if np.abs(RotDis) < 240:#240 = 480*sin30
+        if RotIndProj[0,0] < RotIndProj[0,1]:
+            Rot = 1 #anticlockwise rotation
+        else:
+            Rot = 2 #clockwise rotation
+    elif np.abs(RotDis) > 339:#339 = 480*cos30
+        Rot = 0
+    else:
+        Rot = 3
+#    print Rot
+    return Rot
+    
+    
+# mode switch
+def switch(Rot, counter, numOfH, mode):
+    if Rot == 1:
+        counter = 3
+    elif counter > 0 :
+        counter = counter - 1
+                
+    if counter > 0:
+        numOfH = numOfH + 1
+    else:
+        numOfH = 0
+       
+    print "Rot = %d" % Rot
+    print "numOfH = %d"%numOfH        
+    
+    if numOfH >= 15:        
+        if mode >= 3:# 3 modes
+            mode = 0
+        else:
+            mode = mode + 1
+        numOfH = 0
+        counter = 0            
+
+    print "mode = %d\n" % mode
+    return (mode,counter,numOfH)        
+
+    
 
 #########################
 # Do IT
@@ -47,6 +100,8 @@ imgLayer3 = cv2.imread(imgLayer3Path, 1)
 imgLayer4 = cv2.imread(imgLayer4Path, 1)
 
 imgMaskOrig = cv2.imread(imgMaskPath, 1)
+if imgMaskOrig is None:
+    print("The mas image " + imgMaskPath + " could not be read")
 
 heightImgLayer2, widthImgLayer2 = imgLayer2.shape[:2]
 
@@ -100,13 +155,14 @@ else:
 
 
 # Create Window for fullscreen display
-cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN)          
-cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cv2.moveWindow("projector", 1920, 0)
+#cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN)          
+#cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+#cv2.moveWindow("projector", 1920, 0)
 
 cv2.imshow("projector", imgLayer0)    
 
-#initialization
+
+#Loop initialization
 imgProj = imgLayer0
 imgIndex = imgStartIndex
 doLoop = True
@@ -118,49 +174,6 @@ mode = 0 #mode
 numOfH = 0 #number of 'high' states
 counter = 0 #noise toleration 
 
-#rotation detection
-# if no rotation, Rot = 0; if anticlockwise rotation(90+-30), Rot = 1, if 
-#clockwise rotation(90+-30), Rot = 2; else Rot = 3 
-
-def rotation(H,RotIndOrig):        #Rotation dection
-    RotIndProj = np.dot(np.linalg.inv(H), RotIndOrig)
-    RotDis = RotIndProj[1,0] - RotIndProj[1,1]
-    if np.abs(RotDis) < 240:#240 = 480*sin30
-        if RotIndProj[0,0] < RotIndProj[0,1]:
-            Rot = 1 #anticlockwise rotation
-        else:
-            Rot = 2 #clockwise rotation
-    elif np.abs(RotDis) > 339:#339 = 480*cos30
-        Rot = 0
-    else:
-        Rot = 3
-#    print Rot
-    return Rot
-# mode switch
-def switch(Rot,counter,numOfH,mode):
-    if Rot == 1:
-        counter = 3
-    elif counter > 0 :
-        counter = counter - 1
-                
-    if counter > 0:
-        numOfH = numOfH + 1
-    else:
-        numOfH = 0
-       
-    print "Rot = %d" % Rot
-    print "numOfH = %d"%numOfH        
-    
-    if numOfH >= 15:        
-        if mode >= 3:# 3 modes
-            mode = 0
-        else:
-            mode = mode + 1
-        numOfH = 0
-        counter = 0            
-
-    print "mode = %d\n" % mode
-    return (mode,counter,numOfH)        
 
 while doLoop:
  
@@ -205,8 +218,8 @@ while doLoop:
 
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, homographyThreshold)
    
-       # Rotation detection
-    Rot = rotation(H,RotIndOrig)
+    # Rotation detection
+    Rot = rotation(H, RotIndOrig)
     mode,counter,numOfH = switch(Rot,counter,numOfH,mode)
     
     #flashlight Overlay
@@ -230,7 +243,7 @@ while doLoop:
     cv2.imshow("webcam", capturedImg)
 
     #cancelation criteria
-    # note: waitkey does the event procesing of the e.g. the imshow function
+    # note: waitkey does the event procesing of e.g. the imshow function
     key = cv2.waitKey(2)
     if (key == 27) | (imgIndex == imgEndIndex):
         cv2.destroyAllWindows()
@@ -243,10 +256,7 @@ while doLoop:
         doLoop = False
         break
     
-    
-    
-    
-    
+  
     
     
     
