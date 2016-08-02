@@ -15,18 +15,18 @@ import numpy as np
 option = 0 #choose 0 for files, 1 for webcam
 
 #images
-imgLayer0Path = "./src/original.png"
-imgLayer1Path = "./src/muscles.png"
-imgLayer2Path = "./src/originalred.png"
-imgLayer3Path = "./src/originalgreen.png"
-imgLayer4Path = "./src/originalred.png"
+imgLayer0Path = "./layerImgs/original.png"
+imgLayer1Path = "./layerImgs/muscles.png"
+imgLayer2Path = "./layerImgs/originalred.png"
+imgLayer3Path = "./layerImgs/originalgreen.png"
+imgLayer4Path = "./layerImgs/originalred.png"
 
-imgMaskPath = "./src/maskRound.png"
+imgMaskPath = "./layerImgs/maskRound.png"
 
 cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./src/imgs5"
+imgSourceDir = "./imgs5"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 200

@@ -13,12 +13,12 @@ import numpy as np
 option = 0 #choose 0 for files, 1 for webcam
 
 #image Settings
-imgOL_path = "./src/pikachu.jpg"
-imgBG_path = "./src/original.png"
+imgOL_path = ".../src/layerImgs/pikachu.jpg"
+imgBG_path = "../src/layerImgs/original.png"
 camera_device_index = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./src/imgs5"
+imgSourceDir = "../src/imgs5"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 400

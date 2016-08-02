@@ -9,8 +9,8 @@ import cv2
 
 cv2.destroyAllWindows()
 
-imgPath = "./original.png"
-imgMaskPath = "./maskRound.png"
+imgPath = "../src/layerImgs/original.png"
+imgMaskPath = "../src/layerImgs/maskRound.png"
 
 
 img = cv2.imread(imgPath,0)

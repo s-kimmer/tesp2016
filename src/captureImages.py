@@ -12,7 +12,7 @@ import numpy as np
 # Settings
 imgSaveDir = "./imgs5"
 imgFileNameDesc = "img%03d.png"
-imgPathToImageToDisplay = "./original.png"
+imgPathToImageToDisplay = "./layerImgs/original.png"
 numImgsToCapture = 200
 pauseBetweenCaptures = 2000 #[mseconds]
 
