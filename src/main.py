@@ -12,11 +12,11 @@ import numpy as np
 ######################
 # SETTIGNS
 
-option = 0 #choose 0 for files, 1 for webcam
+option = 1 #choose 0 for files, 1 for webcam
 
 #images
 imgLayer0Path = "./layerImgs/original.png"
-imgLayer1Path = "./layerImgs/muscles.png"
+imgLayer1Path = "./layerImgs/skeleton.png"
 imgLayer2Path = "./layerImgs/originalred.png"
 imgLayer3Path = "./layerImgs/originalgreen.png"
 imgLayer4Path = "./layerImgs/originalred.png"
@@ -34,7 +34,9 @@ imgEndIndex = 200
 ### Parameters
 minimumMatchCount = 8
 homographyThreshold = 10
-
+minKeypoints = 10
+# For H feasability check
+margin = (400, 500) #(x,y) x=>width, y=>height
 
 
 #########################
@@ -45,8 +47,64 @@ homographyThreshold = 10
 # if no rotation, Rot = 0; if anticlockwise rotation(90+-30), Rot = 1, if 
 #clockwise rotation(90+-30), Rot = 2; else Rot = 3 
 
+def proj(H, p):
+    ph = np.array([p[0], p[1], 1])
+    pw = np.dot(H, ph)
+    pt = np.array([pw[0] / pw[2], pw[1] / pw[2]])
+    return pt
+
+def checkH(H, size, margin):
+    # size = (width, height)
+    width = size[0] - 1
+    height = size[1] - 1
+    
+    #  ----> x (width)
+    # |
+    # |  p0m ---------- p1m
+    # v
+    # y     p0 --- p1
+    #       |      |
+    #       p3 --- p2
+    #
+    #    p3m ---------- p2m
+    
+    p0 = np.array([0, 0])    
+    p1 = np.array([width, 0])
+    p2 = np.array([width, height])
+    p3 = np.array([0, height])
+
+    p0m = p0 - margin   
+    p2m = p2 + margin
+    
+    # Projected points
+    p0w = proj(H, p0)
+    p1w = proj(H, p1)
+    p2w = proj(H, p2)
+    p3w = proj(H, p3)
+    
+    isInside = False
+    isNotCrossed = False     
+    
+    # Check if point projections are inside margin
+    if all(p0w > p0m) & all(p0w < p2m) & \
+        all(p1w > p0m) & all(p1w < p2m) & \
+        all(p2w > p0m) & all(p2w < p2m) & \
+        all(p3w > p0m) & all(p3w < p2m):
+        isInside = True        
+    
+    # Check if projections are crossed
+    if (p0w[0] < p1w[0]) & (p3w[0] < p2w[0]) & (p0w[0] < p2w[0]) & (p3w[0] < p1w[0]) & \
+        (p0w[1] < p3w[1]) & (p1w[1] < p2w[1]) & (p0w[1] < p2w[1]) & (p1w[1] < p3w[1]):
+        isNotCrossed = True
+    
+    isFeasable = isInside & isNotCrossed #
+    
+    return isFeasable   
+
+
+
 def rotation(H, RotIndOrig):        #Rotation dection
-    RotIndProj = np.dot(np.linalg.inv(H), RotIndOrig)
+    RotIndProj = np.dot(H, RotIndOrig)
     RotDis = RotIndProj[1,0] - RotIndProj[1,1]
     if np.abs(RotDis) < 240:#240 = 480*sin30
         if RotIndProj[0,0] < RotIndProj[0,1]:
@@ -73,8 +131,8 @@ def switch(Rot, counter, numOfH, mode):
     else:
         numOfH = 0
        
-    print "Rot = %d" % Rot
-    print "numOfH = %d"%numOfH        
+    #print "Rot = %d" % Rot
+    #print "numOfH = %d"%numOfH        
     
     if numOfH >= 15:        
         if mode >= 3:# 3 modes
@@ -84,7 +142,7 @@ def switch(Rot, counter, numOfH, mode):
         numOfH = 0
         counter = 0            
 
-    print "mode = %d\n" % mode
+    #print "mode = %d\n" % mode
     return (mode,counter,numOfH)        
 
     
@@ -99,11 +157,10 @@ imgLayer2 = cv2.imread(imgLayer2Path, 1)
 imgLayer3 = cv2.imread(imgLayer3Path, 1)
 imgLayer4 = cv2.imread(imgLayer4Path, 1)
 
+### Load an prepare mask
 imgMaskOrig = cv2.imread(imgMaskPath, 1)
 if imgMaskOrig is None:
     print("The mas image " + imgMaskPath + " could not be read")
-
-heightImgLayer2, widthImgLayer2 = imgLayer2.shape[:2]
 
 threshhold = 125
 imgMask = imgMaskOrig.copy()
@@ -111,18 +168,9 @@ imgMask[imgMaskOrig >= threshhold] = 0
 imgMask[imgMaskOrig < threshhold] = 1
 
 
-maskSize = (imgMask.shape[1],imgMask.shape[0])
+maskSize = (imgMask.shape[1], imgMask.shape[0])
 maskCenter = np.array([maskSize[0] / 2, maskSize[1] / 2, 1])
 
-#Mask initialization
-#wMask = heightImgLayer2 
-#hMask = widthImgLayer2
-#imgMask = np.zeros_like(imgLayer0)
-#yMin = maskCenter[1] - 0.5 * hMask
-#yMax = maskCenter[1] + 0.5 * hMask
-#xMin = maskCenter[0] - 0.5 * wMask
-#xMax = maskCenter[0] + 0.5 * wMask
-#imgMask[yMin:yMax, xMin:xMax] = 1 
 
 
 #Init ORB detector and feature matcher
@@ -132,7 +180,7 @@ orb = cv2.ORB_create()
 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
 
 keyPoints = orb.detect(imgLayer0, None)
-keyPoints, descriptorKeyPoints = orb.compute(imgLayer0, keyPoints)
+keyPoints, desPoints = orb.compute(imgLayer0, keyPoints)
 
 if option == 1:
     #cam initialzation
@@ -141,32 +189,32 @@ if option == 1:
     if cap.isOpened(): # try to get the first frame
         print("Opened camera stream!")
         ret, frame = cap.read()
-        if ret == True:
-            wframe = cap.get(3)
-            hframe = cap.get(4)
-            print("Frame width x height: {} x {} ".format( wframe, hframe ))
+        if ret == False:
+            print("Test capture failed!")
+            quit()
     else:
-        ret = False
-        
-    if ret: 
-        cv2.imshow("webcam", frame)
+        print("Open capture failed!!!")
 else:
+    # Read images
     frame = 0
 
 
 # Create Window for fullscreen display
-#cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN)          
-#cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-#cv2.moveWindow("projector", 1920, 0)
+cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN) 
+cv2.moveWindow("projector", 1920, 0)         
+cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
 
 cv2.imshow("projector", imgLayer0)    
+imgSize = (imgLayer0.shape[1], imgLayer0.shape[0]) #(width, height)
 
-
+    
 #Loop initialization
 imgProj = imgLayer0
 imgIndex = imgStartIndex
 doLoop = True
-
+# init out image
+imgMatchesVisu = 0
 
 RotIndOrig = np.array([[320,320],[0,480],[1,1]])
 Rot = 0
@@ -199,48 +247,74 @@ while doLoop:
     kpProjImg = orb.detect(imgProj, None) 
     kpProjImg, desProjImg = orb.compute(imgProj, kpProjImg)    
     keyPoints = kpProjImg
-    descriptorKeyPoints = desProjImg
+    desPoints = desProjImg
     
     # Find features in curent captured img
     kpCapturedImg = orb.detect(capturedImg, None) 
     kpCapturedImg, desCapturedImg = orb.compute(capturedImg, kpCapturedImg)
     
+
+    if len(kpCapturedImg) < minKeypoints:
+        print("Not enough keypoints")
+        continue
+            
+    
     #find matching points
-    matches = bf.match(descriptorKeyPoints, desCapturedImg) # Match descriptors
+    matches = bf.match(desPoints, desCapturedImg) # Match descriptors
         
     if len(matches) > minimumMatchCount:
-        print(len(matches))
-        src_pts = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
-        dst_pts = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
+        #print(len(matches))
+        ptsOriginal = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
+        ptsCaptured = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
     else:
-        print("Error: less than four matching points")
+        print("Error: to few matching points")
         continue
 
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, homographyThreshold)
-   
-    # Rotation detection
-    Rot = rotation(H, RotIndOrig)
-    mode,counter,numOfH = switch(Rot,counter,numOfH,mode)
-    
-    #flashlight Overlay
-    imgMaskProj = cv2.warpPerspective(imgMask, np.linalg.inv(H), maskSize)
-    
-    
-    if mode == 0:    
-        currentLayerImg = imgLayer1        
-    elif mode == 1:
-        currentLayerImg = imgLayer2
-    elif mode == 2:
-        currentLayerImg = imgLayer3
-    else:        
-        currentLayerImg = imgLayer4
 
-    imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+    if (len(keyPoints) > minKeypoints) & (len(kpCapturedImg) > minKeypoints) \
+        & (len(matches) > minimumMatchCount) \
+        & (len(kpCapturedImg) >= len(keyPoints)):
+        # Note that  matchesMask from 
+        # cv2.drawMatches() does not seem to work with the mask
+        imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
+            imgProj, keyPoints, matches, imgMatchesVisu)
+        
+        cv2.imshow("Matches", imgMatchesVisu)
+
+
+    H, mask = cv2.findHomography(ptsCaptured, ptsOriginal, cv2.RANSAC, homographyThreshold)
+    if checkH(H, imgSize, margin) == True:
+        # Rotation detection
+        #Rot = rotation(H, RotIndOrig)
+        #mode,counter,numOfH = switch(Rot, counter, numOfH, mode)
+        
+        #flashlight Overlay
+        imgMaskProj = cv2.warpPerspective(imgMask, H, maskSize)
+        
+        
+        if mode == 0:    
+            currentLayerImg = imgLayer1        
+        elif mode == 1:
+            currentLayerImg = imgLayer2
+        elif mode == 2:
+            currentLayerImg = imgLayer3
+        else:        
+            currentLayerImg = imgLayer4
+    
+        imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+
+
+    else:
+        print("H is NOT feasable")
+
+    
+
 
 
     # Display stuff
     cv2.imshow("projector", imgProj)
     cv2.imshow("webcam", capturedImg)
+    
 
     #cancelation criteria
     # note: waitkey does the event procesing of e.g. the imshow function
@@ -251,27 +325,7 @@ while doLoop:
         if option == 1:
             print("Releasing image capture device")
             cap.release
-            cap.release
             
         doLoop = False
         break
     
-  
-    
-    
-    
-    
-#    UV = np.dot(np.linalg.inv(H), maskCenter)
-    
-#    #Pikachu Overlay
-#    UVconv = np.array([[0], [0]])
-#    UVconv[0] = max(1 + 0.5 * widthImgLayer2, UV[0])
-#    UVconv[1] = max(1 + 0.5 * heightImgLayer2, UV[1])
-#    UVconv[0] = min(UV[0], 640 - 0.5 * widthImgLayer2 -1)
-#    UVconv[1] = min(UV[1], 480 - 0.5 * heightImgLayer2 -1)
-#    
-# 
-#    #imgProj = np.zeros(h1, w1, np.uint8)
-#    imgProj = imgLayer0.copy()
-#    imgProj[(np.int(UVconv[1] - 0.5 * heightImgLayer2)):np.int((UVconv[1] + 0.5 * heightImgLayer2)), np.int((UVconv[0] - 0.5 * widthImgLayer2)):np.int((UVconv[0] + 0.5 * widthImgLayer2))] = imgLayer2
-   
