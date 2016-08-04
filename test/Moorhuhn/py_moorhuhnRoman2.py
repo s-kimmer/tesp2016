@@ -77,6 +77,47 @@ class Huhn(Turtle):
                 self.start()
             else:
                 self.ausdemspiel = True
+                
+class crosshair(Turtle):
+    def __init__(self, bilddatei, game):
+        Turtle.__init__(self, bilddatei)
+#        self.game = game
+        self.penup()
+        self.speed(0)
+        self.goto(0,0)
+#        self.onclick(self.hit)
+#        self.start()
+#    def start(self):
+#        self.hideturtle()
+#        self.setpos(-WINWIDTH//2-20, random.randint(-WINHEIGHT//3,WINHEIGHT//3))
+#        self.vx = random.randint(6,11) * VELOCITY
+#        self.vy = random.randint(-3,3) * VELOCITY
+#        self.getroffen = False
+#        self.tot = False
+#        self.showturtle()
+#        self.ausdemspiel = False
+#    def hit(self, x, y):
+#        if self.tot or self.game.shots==SHOTS: # game over
+#            return
+#        self.getroffen = True
+#        self.tot = True
+#        self.game.score += 1
+
+    def step(self):
+#        if self.ausdemspiel:
+#            time.sleep(0.01)  # 
+#            return
+#        if self.tot:
+#            self.vy = self.vy - 0.25 * VELOCITY
+        x, y = self.position()
+        x = x + 10
+        y = y + 10
+        self.goto(x,y)
+#        if x > WINWIDTH//2 + 20 or abs(y) > WINHEIGHT//2 + 10: 
+#            if self.game.shots != SHOTS:
+#                self.start()
+#            else:
+#                self.ausdemspiel = True
 
 class MoorhuhnGame(object):
     """Combine elements of Moorhuhn game.
@@ -89,7 +130,9 @@ class MoorhuhnGame(object):
 
         mhm.screen.register_shape("huhn01.gif")
         mhm.screen.register_shape("huhn02.gif")
+        mhm.screen.register_shape("crosshair.gif")
         self.huehner = [Huhn("huhn01.gif", self), Huhn("huhn02.gif", self)]
+        self.crosshair = crosshair("crosshair.gif", self)
         
         self.gameover = True   # now a new game can start
         mhm.screen.onclick(self.shot, 1)
@@ -100,6 +143,7 @@ class MoorhuhnGame(object):
         if not self.gameover:
             return   # altes Spiel läuft noch
         self.mhm.message("GAME RUNNING")
+        self.crosshair.step()
         self.shots = 0
         self.score = 0
         self.gameover = False
@@ -112,6 +156,7 @@ class MoorhuhnGame(object):
             for huhn in self.huehner:
                 gameover = (gameover and huhn.ausdemspiel)
             self.gameover = gameover
+            crosshair.step()
             
         trefferrate = 1.0*self.score/self.shots
         self.mhm.message( ("Score: %1.2f" % trefferrate) +
