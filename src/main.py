@@ -12,10 +12,10 @@ import numpy as np
 ######################
 # SETTIGNS
 
-option = 1 #choose 0 for files, 1 for webcam
+option = 0 #choose 0 for files, 1 for webcam
 
 #images
-imgLayer0Path = "./layerImgs/skin.png"
+imgLayer0Path = "./layerImgs/original.png"
 imgLayer1Path = "./layerImgs/muscles.png"
 imgLayer2Path = "./layerImgs/skeleton.png"
 imgLayer3Path = "./layerImgs/skeleton.png"
@@ -26,17 +26,19 @@ imgMaskPath = "./layerImgs/maskRound.png"
 cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
-imgSourceDir = "./imgs5"
+imgSourceDir = "./imgs2"
 imgFileNameDesc = "img%03d.png"
 imgStartIndex = 0
 imgEndIndex = 200
+
+determineKeyPointsFromMergedImg = False
 
 ### Parameters
 minimumMatchCount = 8
 homographyThreshold = 10
 minKeypoints = 10
 # For H feasability check
-margin = (400, 500) #(x,y) x=>width, y=>height
+margin = (1800, 1600) #(x,y) x=>width, y=>height
 
 
 #########################
@@ -52,7 +54,7 @@ def proj(H, p):
     pw = np.dot(H, ph)
     pt = np.array([pw[0] / pw[2], pw[1] / pw[2]])
     return pt
-
+    
 def checkH(H, size, margin):
     # size = (width, height)
     width = size[0] - 1
@@ -82,31 +84,31 @@ def checkH(H, size, margin):
     p2w = proj(H, p2)
     p3w = proj(H, p3)
     
-    isInside = False
-    isNotCrossed = False     
+    isInside = False  
+    isConvex = False  
     
     # Check if point projections are inside margin
     if all(p0w > p0m) & all(p0w < p2m) & \
         all(p1w > p0m) & all(p1w < p2m) & \
         all(p2w > p0m) & all(p2w < p2m) & \
         all(p3w > p0m) & all(p3w < p2m):
-        isInside = True        
+        isInside = True    
+    else:
+        print("is NOT Inside")
     
-    # Check if projections are crossed
-    if (p0w[0] < p1w[0]) & (p3w[0] < p2w[0]) & (p0w[0] < p2w[0]) & (p3w[0] < p1w[0]) & \
-        (p0w[1] < p3w[1]) & (p1w[1] < p2w[1]) & (p0w[1] < p2w[1]) & (p1w[1] < p3w[1]):
-        isNotCrossed = True
     # Check if points are convex
-    for i in (0,1,2,3) 
-         dx1 = x[k+1]-x[k]
-         dy1 = y[k+1]-y[k]
-         dx2 = x[k+2]-x[k+1]
-         dy2 = y[k+2]-y[k+1]
-         zcrossproduct = dx1*dy2 - dy1*dx2    
+    cp0 = np.cross(p1w - p0w, p2w - p1w)
+    cp1 = np.cross(p2w - p1w, p3w - p2w)
+    cp2 = np.cross(p3w - p2w, p0w - p3w)
+    cp3 = np.cross(p0w - p3w, p1w - p0w)
+    if (cp0 > 0) & (cp1 > 0) & (cp2 > 0) & (cp3 > 0):
+        isConvex = True
+    else:
+        print("is NOT Convex")
+        
+    isFeasable = isInside & isConvex
     
-    isFeasable = isInside & isNotCrossed #
-    
-    return isFeasable   
+    return isFeasable  
 
 
 
@@ -152,7 +154,23 @@ def switch(Rot, counter, numOfH, mode):
     #print "mode = %d\n" % mode
     return (mode,counter,numOfH)        
 
+
+def overlayWarp(H, backgroundImg, overlayImg, mask):
     
+#    maskSize = (imgMask.shape[1], imgMask.shape[0])
+#    maskCenter = np.array([maskSize[0] / 2, maskSize[1] / 2, 1])    
+        
+    imgSize = (backgroundImg.shape[1], backgroundImg.shape[0])
+    overlayImgMasked = overlayImg * mask
+    imgProjected = cv2.warpPerspective(overlayImgMasked, H, imgSize)
+
+    validIndex = imgProjected != 0
+    
+    overlaidImg = backgroundImg.copy()
+
+    overlaidImg[validIndex] = overlayImg[validIndex]
+    
+    return overlaidImg
 
 #########################
 # Do IT
@@ -207,11 +225,11 @@ else:
 
 
 # Create Window for fullscreen display
-cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN) 
+#cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN) 
 #cv2.namedWindow("projector") 
-cv2.moveWindow("projector", 1920, 0)         
-cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cv2.setWindowProperty("projector", cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_KEEPRATIO)
+#cv2.moveWindow("projector", 1920, 0)         
+#cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+#cv2.setWindowProperty("projector", cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_KEEPRATIO)
 #cv2.setWindowProperty("projector", cv2.WND_PROP_AUTOSIZE, cv2.WINDOW_NORMAL)
 
 cv2.imshow("projector", imgLayer0)    
@@ -253,10 +271,11 @@ while doLoop:
         
     
     # Find features in projector img
-    kpProjImg = orb.detect(imgProj, None) 
-    kpProjImg, desProjImg = orb.compute(imgProj, kpProjImg)    
-    keyPoints = kpProjImg
-    desPoints = desProjImg
+    if determineKeyPointsFromMergedImg == True:
+        kpProjImg = orb.detect(imgProj, None) 
+        kpProjImg, desProjImg = orb.compute(imgProj, kpProjImg)    
+        keyPoints = kpProjImg
+        desPoints = desProjImg
     
     # Find features in curent captured img
     kpCapturedImg = orb.detect(capturedImg, None) 
@@ -278,8 +297,14 @@ while doLoop:
                 & (len(kpCapturedImg) >= len(keyPoints)):
                 # Note that  matchesMask from 
                 # cv2.drawMatches() does not seem to work with the mask
-                imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
-                    imgProj, keyPoints, matches, imgMatchesVisu)
+                
+                if determineKeyPointsFromMergedImg == True:
+                    imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
+                        imgProj, keyPoints, matches, imgMatchesVisu)
+                else:
+                    imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
+                        imgLayer0, keyPoints, matches, imgMatchesVisu)
+                        
                 
                 cv2.imshow("Matches", imgMatchesVisu)
         
@@ -304,6 +329,8 @@ while doLoop:
                     currentLayerImg = imgLayer4
             
                 imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+                
+                #imgProj = overlayWarp(H, imgLayer0, currentLayerImg, imgMask)
  
             else:
                 print("H is NOT feasable")
