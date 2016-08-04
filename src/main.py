@@ -15,11 +15,11 @@ import numpy as np
 option = 1 #choose 0 for files, 1 for webcam
 
 #images
-imgLayer0Path = "./layerImgs/original.png"
-imgLayer1Path = "./layerImgs/skeleton.png"
-imgLayer2Path = "./layerImgs/originalred.png"
-imgLayer3Path = "./layerImgs/originalgreen.png"
-imgLayer4Path = "./layerImgs/originalred.png"
+imgLayer0Path = "./layerImgs/skin.png"
+imgLayer1Path = "./layerImgs/muscles.png"
+imgLayer2Path = "./layerImgs/skeleton.png"
+imgLayer3Path = "./layerImgs/skeleton.png"
+imgLayer4Path = "./layerImgs/skeleton.png"
 
 imgMaskPath = "./layerImgs/maskRound.png"
 
@@ -96,6 +96,13 @@ def checkH(H, size, margin):
     if (p0w[0] < p1w[0]) & (p3w[0] < p2w[0]) & (p0w[0] < p2w[0]) & (p3w[0] < p1w[0]) & \
         (p0w[1] < p3w[1]) & (p1w[1] < p2w[1]) & (p0w[1] < p2w[1]) & (p1w[1] < p3w[1]):
         isNotCrossed = True
+    # Check if points are convex
+    for i in (0,1,2,3) 
+         dx1 = x[k+1]-x[k]
+         dy1 = y[k+1]-y[k]
+         dx2 = x[k+2]-x[k+1]
+         dy2 = y[k+2]-y[k+1]
+         zcrossproduct = dx1*dy2 - dy1*dx2    
     
     isFeasable = isInside & isNotCrossed #
     
@@ -201,13 +208,15 @@ else:
 
 # Create Window for fullscreen display
 cv2.namedWindow("projector", cv2.WND_PROP_FULLSCREEN) 
+#cv2.namedWindow("projector") 
 cv2.moveWindow("projector", 1920, 0)         
 cv2.setWindowProperty("projector", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
+cv2.setWindowProperty("projector", cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_KEEPRATIO)
+#cv2.setWindowProperty("projector", cv2.WND_PROP_AUTOSIZE, cv2.WINDOW_NORMAL)
 
 cv2.imshow("projector", imgLayer0)    
 imgSize = (imgLayer0.shape[1], imgLayer0.shape[0]) #(width, height)
-
+cv2.waitKey(1)
     
 #Loop initialization
 imgProj = imgLayer0
@@ -254,62 +263,54 @@ while doLoop:
     kpCapturedImg, desCapturedImg = orb.compute(capturedImg, kpCapturedImg)
     
 
-    if len(kpCapturedImg) < minKeypoints:
-        print("Not enough keypoints")
-        continue
+    if len(kpCapturedImg) > minKeypoints:
+   
+        #find matching points
+        matches = bf.match(desPoints, desCapturedImg) # Match descriptors
             
+        if len(matches) > minimumMatchCount:
+            #print(len(matches))
+            ptsOriginal = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
+            ptsCaptured = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
     
-    #find matching points
-    matches = bf.match(desPoints, desCapturedImg) # Match descriptors
+            if (len(keyPoints) > minKeypoints) & (len(kpCapturedImg) > minKeypoints) \
+                & (len(matches) > minimumMatchCount) \
+                & (len(kpCapturedImg) >= len(keyPoints)):
+                # Note that  matchesMask from 
+                # cv2.drawMatches() does not seem to work with the mask
+                imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
+                    imgProj, keyPoints, matches, imgMatchesVisu)
+                
+                cv2.imshow("Matches", imgMatchesVisu)
         
-    if len(matches) > minimumMatchCount:
-        #print(len(matches))
-        ptsOriginal = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
-        ptsCaptured = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
+        
+            H, mask = cv2.findHomography(ptsCaptured, ptsOriginal, cv2.RANSAC, homographyThreshold)
+            if checkH(H, imgSize, margin) == True:
+                # Rotation detection
+                #Rot = rotation(H, RotIndOrig)
+                #mode,counter,numOfH = switch(Rot, counter, numOfH, mode)
+                
+                #flashlight Overlay
+                imgMaskProj = cv2.warpPerspective(imgMask, H, maskSize)
+                
+                
+                if mode == 0:    
+                    currentLayerImg = imgLayer1        
+                elif mode == 1:
+                    currentLayerImg = imgLayer2
+                elif mode == 2:
+                    currentLayerImg = imgLayer3
+                else:        
+                    currentLayerImg = imgLayer4
+            
+                imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
+ 
+            else:
+                print("H is NOT feasable")
+        else:
+            print("To few matching points")
     else:
-        print("Error: to few matching points")
-        continue
-
-
-    if (len(keyPoints) > minKeypoints) & (len(kpCapturedImg) > minKeypoints) \
-        & (len(matches) > minimumMatchCount) \
-        & (len(kpCapturedImg) >= len(keyPoints)):
-        # Note that  matchesMask from 
-        # cv2.drawMatches() does not seem to work with the mask
-        imgMatchesVisu = cv2.drawMatches(capturedImg, kpCapturedImg, \
-            imgProj, keyPoints, matches, imgMatchesVisu)
-        
-        cv2.imshow("Matches", imgMatchesVisu)
-
-
-    H, mask = cv2.findHomography(ptsCaptured, ptsOriginal, cv2.RANSAC, homographyThreshold)
-    if checkH(H, imgSize, margin) == True:
-        # Rotation detection
-        #Rot = rotation(H, RotIndOrig)
-        #mode,counter,numOfH = switch(Rot, counter, numOfH, mode)
-        
-        #flashlight Overlay
-        imgMaskProj = cv2.warpPerspective(imgMask, H, maskSize)
-        
-        
-        if mode == 0:    
-            currentLayerImg = imgLayer1        
-        elif mode == 1:
-            currentLayerImg = imgLayer2
-        elif mode == 2:
-            currentLayerImg = imgLayer3
-        else:        
-            currentLayerImg = imgLayer4
-    
-        imgProj = np.multiply(currentLayerImg, imgMaskProj) + np.multiply(imgLayer0, (1-imgMaskProj))
-
-
-    else:
-        print("H is NOT feasable")
-
-    
-
-
+        print("Not enough keypoints")
 
     # Display stuff
     cv2.imshow("projector", imgProj)
