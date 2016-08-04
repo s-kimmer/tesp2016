@@ -12,7 +12,7 @@ import numpy as np
 ######################
 # SETTIGNS
 
-option = 0 #choose 0 for files, 1 for webcam
+option = 1 #choose 0 for files, 1 for webcam
 
 #images
 imgLayer0Path = "./layerImgs/original.png"
@@ -23,7 +23,7 @@ imgLayer4Path = "./layerImgs/originalred.png"
 
 imgMaskPath = "./layerImgs/maskRound.png"
 
-cameraDeviceIndex = 0 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+cameraDeviceIndex = 1 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
 
 # For captured camera images:
 imgSourceDir = "./imgs5"
@@ -46,45 +46,54 @@ homographyThreshold = 10
 #clockwise rotation(90+-30), Rot = 2; else Rot = 3 
 
 def rotation(H, RotIndOrig):        #Rotation dection
-    RotIndProj = np.dot(np.linalg.inv(H), RotIndOrig)
-    RotDis = RotIndProj[1,0] - RotIndProj[1,1]
-    if np.abs(RotDis) < 240:#240 = 480*sin30
-        if RotIndProj[0,0] < RotIndProj[0,1]:
-            Rot = 1 #anticlockwise rotation
-        else:
-            Rot = 2 #clockwise rotation
-    elif np.abs(RotDis) > 339:#339 = 480*cos30
+    RotIndProj = np.dot(H, RotIndOrig)
+    RotIndx1 = RotIndProj[0,0]/RotIndProj[2,0] 
+    RotIndx2 = RotIndProj[0,1]/RotIndProj[2,1]
+    RotIndy1 = RotIndProj[1,0]/RotIndProj[2,0]
+    RotIndy2 = RotIndProj[1,1]/RotIndProj[2,1]
+    tanAngle = np.abs(RotIndx1-RotIndx2)/max(0.1,np.abs(RotIndy1-RotIndy2))
+    if tanAngle < 0.57:# tan30
         Rot = 0
+    elif tanAngle > 1.707: #tan30
+        Rot = 1
     else:
-        Rot = 3
+        Rot = 2
+#    print RotIndx1,RotIndy1,RotIndx2,RotIndy2
+#    print "tanAngle = %f" % tanAngle
 #    print Rot
     return Rot
     
     
 # mode switch
-def switch(Rot, counter, numOfH, mode):
+def switch(Rot, counter, numOfH, mode,flag):
     if Rot == 1:
         counter = 3
     elif counter > 0 :
-        counter = counter - 1
-                
+        counter = counter - 1  
+             
     if counter > 0:
         numOfH = numOfH + 1
     else:
-        numOfH = 0
-       
-    print "Rot = %d" % Rot
-    print "numOfH = %d"%numOfH        
+        numOfH = 0        
     
-    if numOfH >= 15:        
-        if mode >= 3:# 3 modes
+    if numOfH > 7:
+        flag =1
+
+
+#    print "Rot = %d" % Rot
+#    print "numOfH = %d"%numOfH
+#    print "flag = %d"%flag    
+    if flag == 1 and Rot == 0:        
+        
+        if mode >= 3:# 4 modes
             mode = 0
         else:
             mode = mode + 1
-        numOfH = 0
-        counter = 0            
+        print "mode = %d\n" % mode
+        counter = 0
+        numOfH = 0   
+        flag =0         
 
-    print "mode = %d\n" % mode
     return (mode,counter,numOfH)        
 
     
@@ -173,7 +182,7 @@ Rot = 0
 mode = 0 #mode
 numOfH = 0 #number of 'high' states
 counter = 0 #noise toleration 
-
+flag = 0
 
 while doLoop:
  
@@ -190,7 +199,7 @@ while doLoop:
         # File Source
         imgFileName = imgFileNameDesc % (imgIndex)
         imgFilePath = imgSourceDir + "/" + imgFileName
-        print("Loading: " + imgFilePath)
+#       print("Loading: " + imgFilePath)
         capturedImg = cv2.imread(imgFilePath, 1)
         imgIndex = imgIndex + 1
         
@@ -209,7 +218,7 @@ while doLoop:
     matches = bf.match(descriptorKeyPoints, desCapturedImg) # Match descriptors
         
     if len(matches) > minimumMatchCount:
-        print(len(matches))
+ #       print(len(matches))
         src_pts = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
         dst_pts = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
     else:
@@ -217,10 +226,10 @@ while doLoop:
         continue
 
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, homographyThreshold)
-   
+    
     # Rotation detection
     Rot = rotation(H, RotIndOrig)
-    mode,counter,numOfH = switch(Rot,counter,numOfH,mode)
+    mode,counter,numOfH = switch(Rot,counter,numOfH,mode,flag)
     
     #flashlight Overlay
     imgMaskProj = cv2.warpPerspective(imgMask, np.linalg.inv(H), maskSize)
@@ -239,7 +248,7 @@ while doLoop:
 
 
     # Display stuff
-    cv2.imshow("projector", imgProj)
+#    cv2.imshow("projector", imgProj)
     cv2.imshow("webcam", capturedImg)
 
     #cancelation criteria
