@@ -7,6 +7,8 @@ from turtle import Screen, Turtle # title, mainloop
 import turtle
 import random, time
 import numpy as np
+import cv2
+
 try:
     import winsound
     _SOUND = True
@@ -21,6 +23,57 @@ HIT = "getroffen.wav"
 MISSED = "daneben.wav"
 GOOD = "gameover.wav"
 MODERATE = "applaus.wav"
+
+## Homography
+imgLayer0Path = "./uschi.png"
+cameraDeviceIndex = 1 #choose camera device [0,N-1], 0 for first device, 1 for second device etc.
+minimumMatchCount = 8
+homographyThreshold = 10
+minKeypoints = 10
+# For H feasability check
+margin = (1800, 1600) #(x,y) x=>width, y=>height
+
+#calculate Keypoints
+imgLayer0 = cv2.imread(imgLayer0Path, 1)
+if imgLayer0 == None:
+    print("errror")
+cv2.imshow("bg", imgLayer0)
+
+#Init ORB detector and feature matcher
+cv2.ocl.setUseOpenCL(False) #bugfix
+orb = cv2.ORB_create()
+
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) #create BFMatcher object
+
+keyPoints = orb.detect(imgLayer0, None)
+keyPoints, desPoints = orb.compute(imgLayer0, keyPoints)
+print("keypoints precalcualted")
+
+#initialize camera
+cap = cv2.VideoCapture(cameraDeviceIndex)
+    
+if cap.isOpened(): # try to get the first frame
+    print("Opened camera stream!")
+    ret, frame = cap.read()
+    if ret == False:
+        print("Test capture failed!")
+        quit()
+else:
+    print("Open capture failed!!!")
+ 
+#rotation detection       
+RotIndOrig = np.array([[320,320],[0,480],[1,1]])
+Rot = 0
+mode = 0 #mode
+numOfH = 0 #number of 'high' states
+counter = 0 #noise toleration 
+
+def proj(H, p):
+    ph = np.array([p[0], p[1], 1])
+    pw = np.dot(H, ph)
+    pt = np.array([pw[0] / pw[2], pw[1] / pw[2]])
+    return pt
+
 
 import win32api, win32con
 def click(x,y):
@@ -96,7 +149,7 @@ class MoorhuhnGame(object):
     def __init__(self):
         self.mhm = mhm= MHManager(WINWIDTH, WINHEIGHT) # erzeugt
                                      # Grafik-Fenster
-        mhm.screen.bgpic("moon1280x790config.gif")
+        mhm.screen.bgpic("uschi.gif")
         mhm.message("Press spacebar to start game!")
 
         mhm.screen.register_shape("huhn01.gif")
@@ -199,15 +252,51 @@ class crosshair(Turtle):
         
     def getpos(self):
         
-        self.u = np.float((random.random()-0.5) * 400 + 640)
-        self.v = np.float((random.random()-0.5) * 400 + 400)
+        # Web cam
+        ret, capturedImg = cap.read()
+        cv2.imshow("webcam", capturedImg)
+        if ret == False:
+            print("Img capture failed")
+        # Find features in curent captured img
+        kpCapturedImg = orb.detect(capturedImg, None) 
+        kpCapturedImg, desCapturedImg = orb.compute(capturedImg, kpCapturedImg)
+        
+        if len(kpCapturedImg) > minKeypoints:
+   
+            #find matching points
+            matches = bf.match(desPoints, desCapturedImg) # Match descriptors
+            
+            if len(matches) > minimumMatchCount:
+                #print(len(matches))
+                ptsOriginal = np.float32([ keyPoints[m.queryIdx].pt for m in matches ])
+                ptsCaptured = np.float32([ kpCapturedImg[m.trainIdx].pt for m in matches ])
+                
+                H, mask = cv2.findHomography(ptsCaptured, ptsOriginal, cv2.RANSAC, homographyThreshold)
+                if True: #checkH(H, imgSize, margin) == True:
+                    # Rotation detection
+                    #Rot = rotation(H, RotIndOrig)
+                    #mode,counter,numOfH = switch(Rot, counter, numOfH, mode)
+                     pt = proj(H, np.array([320, 240]))
+                     print(pt)
+                     self.u = pt[0]
+                     self.v = pt[1]
+                     
+                else:
+                    print("H is NOT feasable")
+            else:
+                print("To few matching points")
+        else:
+            print("Not enough keypoints")
+        
+#        self.u = np.float((random.random()-0.5) * 400 + 640)
+#        self.v = np.float((random.random()-0.5) * 400 + 400)
         
         if random.random() < 0.05:
             self.rot = 1
         else:
             self.rot = 0
         self.step()
-#        print("getpos")
+        print("getpos")
 
 
 def main():  # for xturtleDemo
